@@ -34,7 +34,7 @@ public class InstanceHeathCheckScheduler {
             try {
                 var response = restTemplate.getForEntity(getStorageUrl(entry.getValue()), Void.class);
 
-                if(!response.getStatusCode().is2xxSuccessful()){
+                if (!response.getStatusCode().is2xxSuccessful()) {
                     log.debug("Storage instance id: {}, intance type : {} has been unregistered ", entry.getKey().id(), entry.getKey().instatnceType());
                     storageInstanceHolder.unregister(entry.getKey());
                 }

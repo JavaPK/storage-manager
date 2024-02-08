@@ -8,8 +8,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 public class StoragemanagerApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(StoragemanagerApplication.class, args);
-	}
+    public static void main(String[] args) {
+        SpringApplication.run(StoragemanagerApplication.class, args);
+    }
 
 }

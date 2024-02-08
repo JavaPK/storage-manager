@@ -17,7 +17,7 @@ public class RegisterStorageController {
     private final RegisterStorageService registerStorageService;
 
     @PostMapping
-    public ResponseEntity<Boolean> registerInstance(@RequestBody RegisterInstanceDTO registerInstanceDTO){
+    public ResponseEntity<Boolean> registerInstance(@RequestBody RegisterInstanceDTO registerInstanceDTO) {
         return ResponseEntity.ok(registerStorageService.register(registerInstanceDTO));
     }
 }

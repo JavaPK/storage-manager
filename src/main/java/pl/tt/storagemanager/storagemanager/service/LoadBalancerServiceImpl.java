@@ -12,13 +12,14 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class LoadBalancerServiceImpl implements LoadBalancerService{
+public class LoadBalancerServiceImpl implements LoadBalancerService {
 
     private static final AtomicInteger CURRENT_ITERATION = new AtomicInteger(1);
     private final StorageInstanceHolder storageInstanceHolder;
 
     @Override
     public InstanceInfo getNextInstanceInfo() {
+        //TODO: Check if map is empty
         var instanceMap = storageInstanceHolder.getStorageInstances();
         var entryList = instanceMap.entrySet().stream()
                 .filter(entry -> entry.getKey().instatnceType() == InstatnceType.MAIN)
