@@ -1,0 +1,12 @@
+logging:
+  level:
+    root: DEBUG
+
+storagemanager:
+  health-check:
+    heartbeat: 10000
+
+storage:
+  protocol: http
+  endpoint-url:
+    health-check: /api/storage/state
