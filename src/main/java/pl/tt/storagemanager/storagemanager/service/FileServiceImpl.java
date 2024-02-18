@@ -1,14 +1,21 @@
 package pl.tt.storagemanager.storagemanager.service;
 
 import lombok.RequiredArgsConstructor;
+
+import org.apache.tomcat.util.http.fileupload.IOUtils;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpRequest;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.web.client.HttpMessageConverterExtractor;
+import org.springframework.web.client.RequestCallback;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import pl.tt.storagemanager.storagemanager.api.InstanceInfo;
 import pl.tt.storagemanager.storagemanager.config.RestTemplateConfig;
@@ -16,6 +23,7 @@ import pl.tt.storagemanager.storagemanager.model.FileDocument;
 import pl.tt.storagemanager.storagemanager.repository.FileDocumentRepository;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -29,7 +37,7 @@ import com.google.common.hash.Hashing;
 public class FileServiceImpl implements FileService {
 
     private final LoadBalancerService loadBalancerService;
-    private final RestTemplateConfig restTemplateConfig;
+    private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final FileDocumentRepository fileDocumentRepository;
 
@@ -72,36 +80,27 @@ public class FileServiceImpl implements FileService {
         //TODO if not null
 
         ResponseEntity<UUID> response = ResponseEntity.internalServerError().build();
-        var requestEntity = getRequestEntity(file, metadata);
-
+        final UUID uuid = UUID.randomUUID();
         if (instanceInfo != null) {
+            final InputStream inputStream = file.getInputStream();
+            final RequestCallback requestCallback = new RequestCallback() {
+                @Override
+                public void doWithRequest(final ClientHttpRequest request) throws IOException {
+                    request.getHeaders().add("Content-type", MediaType.APPLICATION_OCTET_STREAM_VALUE);
+                    request.getHeaders().add("metadata", objectMapper.writeValueAsString(Map.of("id", uuid.toString())));
+                    IOUtils.copy(inputStream, request.getBody());
+                }
+            };
+
+            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+            restTemplate.setRequestFactory(requestFactory);
+            final HttpMessageConverterExtractor responseExtractor =
+                    new HttpMessageConverterExtractor(UUID.class, restTemplate.getMessageConverters());
+
             String url = HTTP_UPLOAD_PATTERN_URL.formatted(instanceInfo.host(), instanceInfo.port());
-            response = restTemplateConfig.restTemplate().exchange(url, HttpMethod.POST, requestEntity, UUID.class);
+            restTemplate.execute(url, HttpMethod.POST, requestCallback, responseExtractor);
         }
 
-        return response;
-    }
-
-    private static HttpEntity<LinkedMultiValueMap<String, Object>> getRequestEntity(MultipartFile file,
-                                                                                    String metadata) throws IOException {
-        byte[] fileBytes = file.getBytes();
-        //TODO przerobić aby wszystkie headery się przepisywały
-
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-
-        LinkedMultiValueMap<String, String> pdfHeaderMap = new LinkedMultiValueMap<>();
-        pdfHeaderMap.add("Content-disposition", "form-data; name=file; filename=" + file.getOriginalFilename());
-        pdfHeaderMap.add("Content-type", file.getContentType());
-        var fileHttpEntity = new HttpEntity<>(fileBytes, pdfHeaderMap);
-
-        LinkedMultiValueMap<String, Object> multipartReqMap = new LinkedMultiValueMap<>();
-        multipartReqMap.add("file", fileHttpEntity);
-        multipartReqMap.add("metadata", metadata);
-
-
-        HttpEntity<LinkedMultiValueMap<String, Object>> reqEntity = new HttpEntity<>(multipartReqMap, headers);
-        return reqEntity;
+        return ResponseEntity.ok(uuid);
     }
 }
