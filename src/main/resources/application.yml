@@ -1,6 +1,14 @@
+server:
+  port: 9002
+
 logging:
   level:
-    root: DEBUG
+    pl.tt.storagemanager.storagemanager: DEBUG
+
+spring:
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/storage
 
 storagemanager:
   health-check:

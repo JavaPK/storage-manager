@@ -7,29 +7,65 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.multipart.MultipartFile;
 import pl.tt.storagemanager.storagemanager.api.InstanceInfo;
 import pl.tt.storagemanager.storagemanager.config.RestTemplateConfig;
+import pl.tt.storagemanager.storagemanager.model.FileDocument;
+import pl.tt.storagemanager.storagemanager.repository.FileDocumentRepository;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.hash.Hashing;
+
+@Transactional
 @Service
 @RequiredArgsConstructor
 public class FileServiceImpl implements FileService {
 
     private final LoadBalancerService loadBalancerService;
-
     private final RestTemplateConfig restTemplateConfig;
+    private final ObjectMapper objectMapper;
+    private final FileDocumentRepository fileDocumentRepository;
 
-    public static final String HTTP_UPLOAD_PATTERN_URL = "http://%s:%d/api/file";
+    public static final String HTTP_UPLOAD_PATTERN_URL = "http://%s:%d/api/storage/upload";
 
     @Override
     public ResponseEntity<UUID> forwardUpload(MultipartFile file, String metadata) throws IOException {
+        Map<String, String> metadataMap = new HashMap<>(objectMapper.readValue(metadata, Map.class));
+
+        UUID id  = UUID.randomUUID();
+        metadataMap.put("id", id.toString());
 
         InstanceInfo instanceInfo = loadBalancerService.getNextInstanceInfo();
-        return forwardRequest(file, metadata, instanceInfo);
+        ResponseEntity<UUID> response = forwardRequest(file, objectMapper.writeValueAsString(metadataMap), instanceInfo);
+
+        if(response.getStatusCode().is2xxSuccessful()){
+
+            int lastIndexOf = file.getOriginalFilename().lastIndexOf(".");
+            String extension = file.getOriginalFilename().substring(lastIndexOf);
+            String fileName = file.getOriginalFilename().substring(0, lastIndexOf);
+            // sha powinno być zwracane ze storage
+            String sha = Hashing.sha512().hashBytes(file.getBytes()).toString();
+
+            FileDocument fileDocument = FileDocument.builder()
+                    .id(id)
+                    .name(fileName)
+                    .extension(extension)
+                    .contentLength(file.getSize())
+                    .sha(sha)
+                    .metadata(metadataMap)
+                    .build();
+
+            fileDocumentRepository.save(fileDocument);
+        }
+
+        return response;
     }
 
     private ResponseEntity<UUID> forwardRequest(MultipartFile file, String metadata, InstanceInfo instanceInfo) throws IOException {
