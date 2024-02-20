@@ -25,8 +25,6 @@ public class FileDocument {
 
     private Long contentLength;
 
-    private String sha;
-
     private Map<String, String> metadata;
 
 }
